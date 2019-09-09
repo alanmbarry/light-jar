@@ -45,6 +45,7 @@
 I2C_HandleTypeDef hi2c2;
 
 /* USER CODE BEGIN PV */
+const uint16_t I2C_DEV_ADDR_MPU6050 = 0x00D0;
 
 /* USER CODE END PV */
 
@@ -104,13 +105,7 @@ int main(void)
 
 
   /* USER CODE BEGIN 2 */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  GPIO_InitTypeDef GPIO_InitStructure;
-  GPIO_InitStructure.Pin = GPIO_PIN_13;
-  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStructure.Pull = GPIO_NOPULL;
-  GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init (GPIOC, &GPIO_InitStructure);
+
 
 
   //if (SysTick_Config(SystemCoreClock / 1000))
@@ -126,7 +121,8 @@ int main(void)
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
   PinStateLED = GPIO_PIN_RESET;
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
-
+  uint8_t reg75 = 0x75;
+  uint8_t rb_reg75;
   while (1)
   {
     /* USER CODE END WHILE */
@@ -138,6 +134,9 @@ int main(void)
 	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 	  HAL_Delay(500);
 
+	  //HAL_I2C_Master_Transmit(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size, uint32_t Timeout);
+	  HAL_I2C_Master_Transmit(&hi2c2, I2C_DEV_ADDR_MPU6050, &reg75, 1, 20);
+	  HAL_I2C_Master_Receive(&hi2c2, I2C_DEV_ADDR_MPU6050, &rb_reg75, 1, 20);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -193,7 +192,7 @@ static void MX_I2C2_Init(void)
 
   /* USER CODE END I2C2_Init 1 */
   hi2c2.Instance = I2C2;
-  hi2c2.Init.ClockSpeed = 100000;
+  hi2c2.Init.ClockSpeed = 400000;
   hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c2.Init.OwnAddress1 = 0;
   hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -222,6 +221,13 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  GPIO_InitTypeDef GPIO_InitStructure;
+  GPIO_InitStructure.Pin = GPIO_PIN_13;
+  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStructure.Pull = GPIO_NOPULL;
+  GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init (GPIOC, &GPIO_InitStructure);
 
 }
 
