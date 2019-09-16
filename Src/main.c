@@ -34,6 +34,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,7 +44,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c2;
-
+accel_vect_t accel_vect_current;
 /* USER CODE BEGIN PV */
 
 
@@ -121,8 +122,21 @@ int main(void)
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
   PinStateLED = GPIO_PIN_RESET;
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
-  uint8_t reg75 = 0x75;
+
   uint8_t rb_reg;
+
+  // Configure the MPU6050
+  // Set the full-scale range of the accelerometer to ?
+  mpu6050_writereg_simple(&hi2c2, false, 0x1C, 0x08);
+  // Enable low-power cycle mode and disable the temperature sensor
+  mpu6050_writereg_simple(&hi2c2, false, 0x6b, 0x28);
+  // Disable the gyros, set LP_WAKE_CTRL[1:0] to 1, which takes accelerometer readings
+  // at 5Hz
+  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x47);
+
+
+  mpu6050_readreg_simple(&hi2c2, false, 0x6b, &rb_reg);
+  mpu6050_readreg_simple(&hi2c2, false, 0x6c, &rb_reg);
   while (1)
   {
     /* USER CODE END WHILE */
@@ -134,16 +148,8 @@ int main(void)
 	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 	  HAL_Delay(500);
 
+	  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
 
-	  //mpu6050_readreg_simple(&hi2c2, false, 0x75, &rb_reg);
-	  mpu6050_readreg_simple(&hi2c2, false, 0x6b, &rb_reg);
-	  mpu6050_readreg_simple(&hi2c2, false, 0x6c, &rb_reg);
-	  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x07);
-	  mpu6050_readreg_simple(&hi2c2, false, 0x6c, &rb_reg);
-
-	  //HAL_I2C_Master_Transmit(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size, uint32_t Timeout);
-	  //HAL_I2C_Master_Transmit(&hi2c2, I2C_DEV_ADDR_MPU6050, &reg75, 1, 20);
-	  //HAL_I2C_Master_Receive(&hi2c2, I2C_DEV_ADDR_MPU6050, &rb_reg75, 1, 20);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
