@@ -45,7 +45,7 @@
 I2C_HandleTypeDef hi2c2;
 
 /* USER CODE BEGIN PV */
-const uint16_t I2C_DEV_ADDR_MPU6050 = 0x00D0;
+
 
 /* USER CODE END PV */
 
@@ -122,7 +122,7 @@ int main(void)
   PinStateLED = GPIO_PIN_RESET;
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
   uint8_t reg75 = 0x75;
-  uint8_t rb_reg75;
+  uint8_t rb_reg;
   while (1)
   {
     /* USER CODE END WHILE */
@@ -134,9 +134,16 @@ int main(void)
 	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 	  HAL_Delay(500);
 
+
+	  //mpu6050_readreg_simple(&hi2c2, false, 0x75, &rb_reg);
+	  mpu6050_readreg_simple(&hi2c2, false, 0x6b, &rb_reg);
+	  mpu6050_readreg_simple(&hi2c2, false, 0x6c, &rb_reg);
+	  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x07);
+	  mpu6050_readreg_simple(&hi2c2, false, 0x6c, &rb_reg);
+
 	  //HAL_I2C_Master_Transmit(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size, uint32_t Timeout);
-	  HAL_I2C_Master_Transmit(&hi2c2, I2C_DEV_ADDR_MPU6050, &reg75, 1, 20);
-	  HAL_I2C_Master_Receive(&hi2c2, I2C_DEV_ADDR_MPU6050, &rb_reg75, 1, 20);
+	  //HAL_I2C_Master_Transmit(&hi2c2, I2C_DEV_ADDR_MPU6050, &reg75, 1, 20);
+	  //HAL_I2C_Master_Receive(&hi2c2, I2C_DEV_ADDR_MPU6050, &rb_reg75, 1, 20);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

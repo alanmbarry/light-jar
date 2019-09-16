@@ -32,6 +32,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "lib_mpu6050_stm32_hal.h"
 
 /* USER CODE END Includes */
 
