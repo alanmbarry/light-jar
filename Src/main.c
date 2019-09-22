@@ -124,6 +124,13 @@ int main(void)
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 
   uint8_t rb_reg;
+  uint8_t led_rgb_state_test;
+  led_rgb_state_test = 0;
+  GPIO_PinState PinStateRedLED;
+  GPIO_PinState PinStateGreenLED;
+  GPIO_PinState PinStateBlueLED;
+
+
 
   // Configure the MPU6050
   // Set the full-scale range of the accelerometer to ?
@@ -150,6 +157,23 @@ int main(void)
 
 	  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
 
+
+	  PinStateRedLED =   (led_rgb_state_test & 0x04) >> 2;
+	  PinStateGreenLED = (led_rgb_state_test & 0x02) >> 1;
+	  PinStateBlueLED =  (led_rgb_state_test & 0x01);
+
+      if(led_rgb_state_test > 6)
+      {
+	     led_rgb_state_test = 0;
+	  }
+      else
+      {
+ 	     led_rgb_state_test++;
+      }
+
+	  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_0, PinStateRedLED);
+	  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_1, PinStateGreenLED);
+	  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_2, PinStateBlueLED);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -241,6 +265,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStructure.Pull = GPIO_NOPULL;
   GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init (GPIOC, &GPIO_InitStructure);
+
+  GPIO_InitStructure.Pin = GPIO_PIN_0;
+  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStructure.Pull = GPIO_NOPULL;
+  GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init (GPIOA, &GPIO_InitStructure);
+
+  GPIO_InitStructure.Pin = GPIO_PIN_1;
+  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStructure.Pull = GPIO_NOPULL;
+  GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init (GPIOA, &GPIO_InitStructure);
+
+  GPIO_InitStructure.Pin = GPIO_PIN_2;
+  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStructure.Pull = GPIO_NOPULL;
+  GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init (GPIOA, &GPIO_InitStructure);
 
 }
 
