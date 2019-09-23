@@ -44,6 +44,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c2;
+TIM_HandleTypeDef htim2;
+
 accel_vect_t accel_vect_current;
 /* USER CODE BEGIN PV */
 
@@ -54,6 +56,7 @@ accel_vect_t accel_vect_current;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C2_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -103,6 +106,9 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C2_Init();
+  //__HAL_RCC_TIM2_CLK_ENABLE();
+  MX_TIM2_Init();
+
 
 
   /* USER CODE BEGIN 2 */
@@ -157,7 +163,7 @@ int main(void)
 
 	  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
 
-
+      /*
 	  PinStateRedLED =   (led_rgb_state_test & 0x04) >> 2;
 	  PinStateGreenLED = (led_rgb_state_test & 0x02) >> 1;
 	  PinStateBlueLED =  (led_rgb_state_test & 0x01);
@@ -174,6 +180,9 @@ int main(void)
 	  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_0, PinStateRedLED);
 	  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_1, PinStateGreenLED);
 	  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_2, PinStateBlueLED);
+	  */
+
+	  //__HAL_TIM_SET_COMPARE;
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -265,24 +274,85 @@ static void MX_GPIO_Init(void)
   GPIO_InitStructure.Pull = GPIO_NOPULL;
   GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init (GPIOC, &GPIO_InitStructure);
-
-  GPIO_InitStructure.Pin = GPIO_PIN_0;
-  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+  /*
+  GPIO_InitStructure.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2;
+  // GPIO_MODE_AF_PP - AF means 'Alternate Function', i.e. on-chip peripheral,
+  // PWM in this case
+  GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStructure.Pull = GPIO_NOPULL;
   GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init (GPIOA, &GPIO_InitStructure);
+  */
 
-  GPIO_InitStructure.Pin = GPIO_PIN_1;
-  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStructure.Pull = GPIO_NOPULL;
-  GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init (GPIOA, &GPIO_InitStructure);
+}
 
-  GPIO_InitStructure.Pin = GPIO_PIN_2;
-  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStructure.Pull = GPIO_NOPULL;
-  GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init (GPIOA, &GPIO_InitStructure);
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 7;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 3906;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 2000;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_SET;
+  //sConfigOC.OCFastMode = TIM_OCFAST_ENABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
+  HAL_TIM_Base_Start(&htim2);
+  HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_3);
+  //TIM_CCxChannelCmd ( TIMx,  Channel,ChannelState)
 
 }
 
