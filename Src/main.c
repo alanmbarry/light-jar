@@ -20,7 +20,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
+#include <stdlib.h>
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -58,6 +58,7 @@ static void MX_GPIO_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
+uint32_t ProcessAccelVal(int16_t vectelem);
 
 /* USER CODE END PFP */
 
@@ -145,43 +146,35 @@ int main(void)
   mpu6050_writereg_simple(&hi2c2, false, 0x6b, 0x28);
   // Disable the gyros, set LP_WAKE_CTRL[1:0] to 1, which takes accelerometer readings
   // at 5Hz
-  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x47);
+  // Set to 2 for 20Hz
+  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x87);
 
 
   mpu6050_readreg_simple(&hi2c2, false, 0x6b, &rb_reg);
   mpu6050_readreg_simple(&hi2c2, false, 0x6c, &rb_reg);
+
+  //int32_t temp_int32;
+  //uint32_t pulseval_current;
+  PinStateLED = GPIO_PIN_SET;
+  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
   while (1)
   {
     /* USER CODE END WHILE */
 	  PinStateLED = GPIO_PIN_SET;
 	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 
-	  HAL_Delay(500);
-	  PinStateLED = GPIO_PIN_RESET;
-	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
-	  HAL_Delay(500);
+	  HAL_Delay(50);
+	  //PinStateLED = GPIO_PIN_RESET;
+	  //HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
+	  //HAL_Delay(100);
 
 	  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
 
-      /*
-	  PinStateRedLED =   (led_rgb_state_test & 0x04) >> 2;
-	  PinStateGreenLED = (led_rgb_state_test & 0x02) >> 1;
-	  PinStateBlueLED =  (led_rgb_state_test & 0x01);
 
-      if(led_rgb_state_test > 6)
-      {
-	     led_rgb_state_test = 0;
-	  }
-      else
-      {
- 	     led_rgb_state_test++;
-      }
 
-	  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_0, PinStateRedLED);
-	  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_1, PinStateGreenLED);
-	  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_2, PinStateBlueLED);
-	  */
-
+	  TIM2->CCR1 = ProcessAccelVal(accel_vect_current.x);
+	  TIM2->CCR2 = ProcessAccelVal(accel_vect_current.y);
+	  TIM2->CCR3 = ProcessAccelVal(accel_vect_current.z);
 	  //__HAL_TIM_SET_COMPARE;
     /* USER CODE BEGIN 3 */
   }
@@ -303,7 +296,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 7;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 3906;
+  htim2.Init.Period = 4096;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -352,11 +345,29 @@ static void MX_TIM2_Init(void)
   HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_3);
+
+  TIM2->CCR2 = 0;
+  TIM2->CCR1 = 0;
+
   //TIM_CCxChannelCmd ( TIMx,  Channel,ChannelState)
 
 }
 
 /* USER CODE BEGIN 4 */
+uint32_t ProcessAccelVal(int16_t vectelem)
+{
+	  uint32_t returnval;
+	  // Accelerometer value goes from ~ +/- 16384
+	  // Offset and saturate (to avoid overflow later)
+	  returnval = abs(vectelem);
+	  if(returnval > 16383)
+		  returnval = 16383;
+	  else
+		  returnval = returnval;
+
+	  return returnval >> 2;
+
+}
 
 /* USER CODE END 4 */
 
