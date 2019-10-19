@@ -40,6 +40,7 @@ extern "C" {
 /* USER CODE BEGIN ET */
 
 /* USER CODE END ET */
+RTC_HandleTypeDef hrtc;
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
