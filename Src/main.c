@@ -86,6 +86,20 @@ void Delay(uint32_t nTime)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+  /* Concept of code
+   * Configuration
+   * Configruation of accelerometer
+   *
+   * Slow check mode
+   * Measure accelerometer vector
+   * Sleep for 0.5s ?
+   * Measure accelerometer vector
+   * Measure delta
+   * If > x then go to fast update mode, else stay in slow check mode
+   *
+
+   *
+   */
 
   /* USER CODE END 1 */
   
@@ -109,35 +123,21 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C2_Init();
-  //__HAL_RCC_TIM2_CLK_ENABLE();
+  MX_RTC_Init();
   MX_TIM2_Init();
 
-
-
   /* USER CODE BEGIN 2 */
-
-
-
-  //if (SysTick_Config(SystemCoreClock / 1000))
-  //while (1);
-
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  //RTC_TimeTypeDef sTime1;
   GPIO_PinState PinStateLED;
   PinStateLED = GPIO_PIN_SET;
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
   PinStateLED = GPIO_PIN_RESET;
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
-
-  uint8_t rb_reg;
-  uint8_t led_rgb_state_test;
-  led_rgb_state_test = 0;
-  GPIO_PinState PinStateRedLED;
-  GPIO_PinState PinStateGreenLED;
-  GPIO_PinState PinStateBlueLED;
 
 
 
@@ -152,13 +152,23 @@ int main(void)
   mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x87);
 
 
-  mpu6050_readreg_simple(&hi2c2, false, 0x6b, &rb_reg);
-  mpu6050_readreg_simple(&hi2c2, false, 0x6c, &rb_reg);
+  //mpu6050_readreg_simple(&hi2c2, false, 0x6b, &rb_reg);
+  //mpu6050_readreg_simple(&hi2c2, false, 0x6c, &rb_reg);
 
   //int32_t temp_int32;
   //uint32_t pulseval_current;
   PinStateLED = GPIO_PIN_SET;
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
+
+  //__HAL_RTC_ALARM_ENABLE_IT(&hrtc,RTC_IT_ALRA);
+
+  //sTime1.Hours = 0x00;
+  //sTime1.Minutes = 0x00;
+  //sTime1.Seconds = 0x00;
+  //HAL_RTC_SetTime(&hrtc, &sTime1, RTC_FORMAT_BCD);
+  //HAL_RTC_SetAlarm_IT()
+  //HAL_RTC_SetAlarm_IT(&hrtc, RTC_AlarmTypeDef * sAlarm, uint32_t Format)
+
   while (1)
   {
     /* USER CODE END WHILE */
@@ -171,8 +181,6 @@ int main(void)
 	  //HAL_Delay(100);
 
 	  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
-
-
 
 	  TIM2->CCR1 = ProcessAccelVal(accel_vect_current.x);
 	  TIM2->CCR2 = ProcessAccelVal(accel_vect_current.y);
@@ -189,32 +197,40 @@ int main(void)
   */
 void SystemClock_Config(void)
 {
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+	  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+	  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+	  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-  /** Initializes the CPU, AHB and APB busses clocks 
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Initializes the CPU, AHB and APB busses clocks 
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+	  /** Initializes the CPU, AHB and APB busses clocks
+	  */
+	  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
+	  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+	  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+	  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+	  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+	  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+	  /** Initializes the CPU, AHB and APB busses clocks
+	  */
+	  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+	                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+	  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+	  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+	  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+	  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+	  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
+	  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
 }
 
 /**
@@ -270,12 +286,14 @@ static void MX_RTC_Init(void)
   */
   hrtc.Instance = RTC;
   hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
-  hrtc.Init.OutPut = RTC_OUTPUTSOURCE_ALARM;
+  hrtc.Init.OutPut = RTC_OUTPUTSOURCE_NONE;
+
   if (HAL_RTC_Init(&hrtc) != HAL_OK)
   {
     Error_Handler();
   }
   /* USER CODE BEGIN RTC_Init 2 */
+  HAL_RTCEx_SetSecond_IT(&hrtc);
 
   /* USER CODE END RTC_Init 2 */
 
@@ -393,12 +411,30 @@ uint32_t ProcessAccelVal(int16_t vectelem)
 	  // Offset and saturate (to avoid overflow later)
 	  returnval = abs(vectelem);
 	  if(returnval > 16383)
+	  {
 		  returnval = 16383;
-	  else
-		  returnval = returnval;
+	  }
 
 	  return returnval >> 2;
 
+}
+
+void HAL_RTCEx_RTCEventCallback(RTC_HandleTypeDef *hrtc)
+{
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hrtc);
+  static   GPIO_PinState PinStateLED = GPIO_PIN_SET;
+
+  if(  PinStateLED == GPIO_PIN_SET)
+  {
+	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+      PinStateLED = GPIO_PIN_RESET;
+  }
+  else
+  {
+      HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+      PinStateLED = GPIO_PIN_SET;
+  }
 }
 
 /* USER CODE END 4 */
