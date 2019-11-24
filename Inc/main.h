@@ -62,7 +62,9 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 /* USER CODE BEGIN Private defines */
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-void HAL_RTCEx_RTCEventCallback(RTC_HandleTypeDef *hrtc);
+void RTCSecondEventCallback(RTC_HandleTypeDef *hrtc);
+void RTCOverflowEventCallback(RTC_HandleTypeDef *hrtc);
+HAL_StatusTypeDef RTC_Set_Overflow_IT(RTC_HandleTypeDef *hrtc);
 
 
 /* USER CODE END Private defines */

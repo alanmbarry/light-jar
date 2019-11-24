@@ -48,6 +48,11 @@ RTC_HandleTypeDef hrtc;
 TIM_HandleTypeDef htim2;
 
 accel_vect_t accel_vect_current;
+uint32_t led_enabled;
+
+static volatile uint32_t RTCSecondTdelayCounter = 0;
+
+
 /* USER CODE BEGIN PV */
 
 
@@ -100,6 +105,7 @@ int main(void)
 
    *
    */
+  led_enabled = 0;
 
   /* USER CODE END 1 */
   
@@ -175,7 +181,10 @@ int main(void)
 	  PinStateLED = GPIO_PIN_SET;
 	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 
-	  HAL_Delay(50);
+	  RTCSecDelay(500);
+	  PinStateLED = GPIO_PIN_RESET;
+	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
+	  HAL_Delay(500);
 	  //PinStateLED = GPIO_PIN_RESET;
 	  //HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 	  //HAL_Delay(100);
@@ -285,7 +294,9 @@ static void MX_RTC_Init(void)
   /** Initialize RTC Only
   */
   hrtc.Instance = RTC;
-  hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
+  //hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
+  // The second signal will be at 1024Hz with AsynchPrediv == 32
+  hrtc.Init.AsynchPrediv = 32;
   hrtc.Init.OutPut = RTC_OUTPUTSOURCE_NONE;
 
   if (HAL_RTC_Init(&hrtc) != HAL_OK)
@@ -293,6 +304,7 @@ static void MX_RTC_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN RTC_Init 2 */
+  // Enable the 'second' interrupt
   HAL_RTCEx_SetSecond_IT(&hrtc);
 
   /* USER CODE END RTC_Init 2 */
@@ -414,15 +426,14 @@ uint32_t ProcessAccelVal(int16_t vectelem)
 	  {
 		  returnval = 16383;
 	  }
-
 	  return returnval >> 2;
 
 }
 
-void HAL_RTCEx_RTCEventCallback(RTC_HandleTypeDef *hrtc)
+void RTCSecondEventCallback(RTC_HandleTypeDef *hrtc)
 {
   /* Prevent unused argument(s) compilation warning */
-  UNUSED(hrtc);
+  /*
   static   GPIO_PinState PinStateLED = GPIO_PIN_SET;
 
   if(  PinStateLED == GPIO_PIN_SET)
@@ -435,7 +446,52 @@ void HAL_RTCEx_RTCEventCallback(RTC_HandleTypeDef *hrtc)
       HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
       PinStateLED = GPIO_PIN_SET;
   }
+  */
+  if (RTCSecondTdelayCounter != 0x00)
+  {
+	  RTCSecondTdelayCounter --;
+  }
 }
+void RTCSecDelay(uint32_t nTime){
+  RTCSecondTdelayCounter = nTime;
+  while(RTCSecondTdelayCounter != 0);
+}
+
+
+
+void RTCOverflowEventCallback(RTC_HandleTypeDef *hrtc)
+{
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hrtc);
+
+}
+
+// Enable the overflow interrupt in the RTC
+HAL_StatusTypeDef RTC_Set_Overflow_IT(RTC_HandleTypeDef *hrtc)
+{
+  /* Check input parameters */
+  if (hrtc == NULL)
+  {
+    return HAL_ERROR;
+  }
+
+  /* Process Locked */
+  __HAL_LOCK(hrtc);
+
+  hrtc->State = HAL_RTC_STATE_BUSY;
+
+  /* Enable overflow interrupt */
+  __HAL_RTC_OVERFLOW_ENABLE_IT(hrtc, RTC_IT_SEC);
+
+  hrtc->State = HAL_RTC_STATE_READY;
+
+  /* Process Unlocked */
+  __HAL_UNLOCK(hrtc);
+
+  return HAL_OK;
+}
+
+
 
 /* USER CODE END 4 */
 

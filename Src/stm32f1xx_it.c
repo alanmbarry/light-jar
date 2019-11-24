@@ -58,6 +58,8 @@
 /* External variables --------------------------------------------------------*/
 extern RTC_HandleTypeDef hrtc;
 /* USER CODE BEGIN EV */
+extern void RTCSecondEventCallback(RTC_HandleTypeDef *hrtc);
+extern void RTCOverflowEventCallback(RTC_HandleTypeDef *hrtc);
 
 /* USER CODE END EV */
 
@@ -203,9 +205,60 @@ void SysTick_Handler(void)
 void RTC_IRQHandler(void)
 {
   /* USER CODE BEGIN RTC_IRQn 0 */
+  // Overflow event has higher priority - if both flags are set we
+  // don't call the second event handler code
+  //__HAL_RTC_X_GET_IT_SOURCE: is the interrupt X source enabled?
+  //__HAL_RTC_X_GET_FLAG: - has this interrupt been triggered (has the flag been set?)?
+  // #define __HAL_RTC_SECOND_GET_FLAG(__HANDLE__, __FLAG__)        (((((__HANDLE__)->Instance->CRL) & (__FLAG__)) != RESET)? SET : RESET)
+  // #define __HAL_RTC_OVERFLOW_GET_FLAG(__HANDLE__, __FLAG__)      (((((__HANDLE__)->Instance->CRL) & (__FLAG__)) != RESET)? SET : RESET)
+
+	  if (__HAL_RTC_SECOND_GET_IT_SOURCE(&hrtc, RTC_IT_SEC))
+	  {
+	    /* Get the status of the Interrupt */
+	    if (__HAL_RTC_SECOND_GET_FLAG(&hrtc, RTC_FLAG_SEC))
+	    {
+	      /* Check if overflow flag set */
+	      if (__HAL_RTC_SECOND_GET_FLAG(&hrtc, RTC_FLAG_OW))
+	      {
+	        /* Overflow callback */
+	    	  RTCOverflowEventCallback(&hrtc);
+
+	        /* Clear flag Overflow */
+	        __HAL_RTC_OVERFLOW_CLEAR_FLAG(&hrtc, RTC_FLAG_OW);
+
+	        /* Change RTC state */
+	        (&hrtc)->State = HAL_RTC_STATE_READY;
+	      }
+	      else
+	      {
+	        /* Second callback */
+	    	RTCSecondEventCallback(&hrtc);
+	        /* Change RTC state */
+	        (&hrtc)->State = HAL_RTC_STATE_READY;
+	      }
+	      /* Clear flag Second */
+	      __HAL_RTC_SECOND_CLEAR_FLAG(&hrtc, RTC_FLAG_SEC);
+	    }
+	  }
+	  else if (__HAL_RTC_OVERFLOW_GET_IT_SOURCE(&hrtc, RTC_IT_OW))
+	  {
+	      /* Check if overflow flag set */
+	      if (__HAL_RTC_OVERFLOW_GET_FLAG(&hrtc, RTC_FLAG_OW))
+	      {
+	        /* Overflow callback */
+	    	  RTCOverflowEventCallback(&hrtc);
+
+	        /* Clear flag Overflow */
+	        __HAL_RTC_OVERFLOW_CLEAR_FLAG(&hrtc, RTC_FLAG_OW);
+
+	        /* Change RTC state */
+	        (&hrtc)->State = HAL_RTC_STATE_READY;
+	      }
+	  }
+
 
   /* USER CODE END RTC_IRQn 0 */
-  HAL_RTCEx_RTCIRQHandler(&hrtc);
+  //HAL_RTCEx_RTCIRQHandler(&hrtc);
   /* USER CODE BEGIN RTC_IRQn 1 */
 
   /* USER CODE END RTC_IRQn 1 */
