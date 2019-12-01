@@ -63,8 +63,13 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void RTCSecondEventCallback(RTC_HandleTypeDef *hrtc);
+void RTCAlarmAEventCallback(RTC_HandleTypeDef *hrtc);
 void RTCOverflowEventCallback(RTC_HandleTypeDef *hrtc);
 HAL_StatusTypeDef RTC_Set_Overflow_IT(RTC_HandleTypeDef *hrtc);
+void RTCSecDelay(uint32_t nTime);
+void RTCAlarmDelayNoSleep(uint32_t nTime);
+void RTCAlarmDelayWithStop(uint32_t nTime);
+
 
 
 /* USER CODE END Private defines */

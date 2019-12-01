@@ -51,6 +51,7 @@ accel_vect_t accel_vect_current;
 uint32_t led_enabled;
 
 static volatile uint32_t RTCSecondTdelayCounter = 0;
+static volatile uint32_t AlarmITTriggered = 0;
 
 
 /* USER CODE BEGIN PV */
@@ -139,6 +140,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   //RTC_TimeTypeDef sTime1;
+  uint32_t mainwhileloopcount = 0;
   GPIO_PinState PinStateLED;
   PinStateLED = GPIO_PIN_SET;
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
@@ -175,25 +177,41 @@ int main(void)
   //HAL_RTC_SetAlarm_IT()
   //HAL_RTC_SetAlarm_IT(&hrtc, RTC_AlarmTypeDef * sAlarm, uint32_t Format)
 
+
   while (1)
   {
     /* USER CODE END WHILE */
 	  PinStateLED = GPIO_PIN_SET;
 	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 
-	  RTCSecDelay(500);
+	  RTCAlarmDelayNoSleep(20);
 	  PinStateLED = GPIO_PIN_RESET;
 	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
-	  HAL_Delay(500);
-	  //PinStateLED = GPIO_PIN_RESET;
-	  //HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
-	  //HAL_Delay(100);
+	  //HAL_Delay(500);
+	  RTCAlarmDelayNoSleep(20);
+
+
 
 	  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
 
 	  TIM2->CCR1 = ProcessAccelVal(accel_vect_current.x);
 	  TIM2->CCR2 = ProcessAccelVal(accel_vect_current.y);
 	  TIM2->CCR3 = ProcessAccelVal(accel_vect_current.z);
+
+	  if(mainwhileloopcount >= 30)
+	  {
+		  //TIM2->CCR1 = 0;
+		  //TIM2->CCR2 = 0;
+		  //TIM2->CCR3 = 0;
+		  //RTCAlarmDelayNoSleep(500);
+		  RTCAlarmDelayWithStop(500);
+		  mainwhileloopcount = 0;
+	  }
+	  else
+	  {
+	     mainwhileloopcount = mainwhileloopcount + 1;
+	  }
+
 	  //__HAL_TIM_SET_COMPARE;
     /* USER CODE BEGIN 3 */
   }
@@ -432,38 +450,110 @@ uint32_t ProcessAccelVal(int16_t vectelem)
 
 void RTCSecondEventCallback(RTC_HandleTypeDef *hrtc)
 {
-  /* Prevent unused argument(s) compilation warning */
-  /*
-  static   GPIO_PinState PinStateLED = GPIO_PIN_SET;
 
-  if(  PinStateLED == GPIO_PIN_SET)
-  {
-	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-      PinStateLED = GPIO_PIN_RESET;
-  }
-  else
-  {
-      HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-      PinStateLED = GPIO_PIN_SET;
-  }
-  */
   if (RTCSecondTdelayCounter != 0x00)
   {
 	  RTCSecondTdelayCounter --;
   }
 }
-void RTCSecDelay(uint32_t nTime){
+
+// Delay nTime Second interrupt events
+void RTCSecDelay(uint32_t nTime)
+{
   RTCSecondTdelayCounter = nTime;
   while(RTCSecondTdelayCounter != 0);
 }
 
 
+void RTCAlarmDelayNoSleep(uint32_t nTime)
+{
+  // Disable Alarm interrupt whilst messing around here
+  __HAL_RTC_ALARM_DISABLE_IT(&hrtc, RTC_IT_ALRA);
+  //HAL_RTCEx_DeactivateSecond(&hrtc);
+
+  /* Wait until OK to write to RTC regs  */
+  while ((hrtc.Instance->CRL & RTC_CRL_RTOFF) == (uint32_t)RESET)
+  {
+  }
+  /* Disable the write protection for RTC registers */
+  __HAL_RTC_WRITEPROTECTION_DISABLE(&hrtc);
+
+  /* Set RTC COUNTER MSB word */
+  WRITE_REG(hrtc.Instance->ALRH, (nTime >> 16U));
+  /* Set RTC COUNTER LSB word */
+  WRITE_REG(hrtc.Instance->ALRL, (nTime & RTC_ALRL_RTC_ALR));
+
+  /* Set RTC COUNTER MSB word */
+  WRITE_REG(hrtc.Instance->CNTH, (0 >> 16U));
+  /* Set RTC COUNTER LSB word */
+  WRITE_REG(hrtc.Instance->CNTL, (0 & RTC_CNTL_RTC_CNT));
+
+
+  __HAL_RTC_WRITEPROTECTION_ENABLE(&hrtc);
+
+
+  /* Wait till RTC has finished handling the write transfer  */
+  while ((hrtc.Instance->CRL & RTC_CRL_RTOFF) == (uint32_t)RESET)
+  {
+  }
+
+  // Enable Alarm interrupt
+  AlarmITTriggered = 0;
+  __HAL_RTC_ALARM_ENABLE_IT(&hrtc, RTC_IT_ALRA);
+  //HAL_RTCEx_SetSecond_IT(&hrtc);
+
+  while(AlarmITTriggered == 0)
+  {
+  }
+}
+
+void RTCAlarmDelayWithStop(uint32_t nTime)
+{
+  // Disable Alarm interrupt whilst messing around here
+  __HAL_RTC_ALARM_DISABLE_IT(&hrtc, RTC_IT_ALRA);
+  //HAL_RTCEx_DeactivateSecond(&hrtc);
+
+  /* Wait until OK to write to RTC regs  */
+  while ((hrtc.Instance->CRL & RTC_CRL_RTOFF) == (uint32_t)RESET)
+  {
+  }
+  /* Disable the write protection for RTC registers */
+  __HAL_RTC_WRITEPROTECTION_DISABLE(&hrtc);
+
+  /* Set RTC COUNTER MSB word */
+  WRITE_REG(hrtc.Instance->ALRH, (nTime >> 16U));
+  /* Set RTC COUNTER LSB word */
+  WRITE_REG(hrtc.Instance->ALRL, (nTime & RTC_ALRL_RTC_ALR));
+
+  /* Set RTC COUNTER MSB word */
+  WRITE_REG(hrtc.Instance->CNTH, (0 >> 16U));
+  /* Set RTC COUNTER LSB word */
+  WRITE_REG(hrtc.Instance->CNTL, (0 & RTC_CNTL_RTC_CNT));
+
+  __HAL_RTC_WRITEPROTECTION_ENABLE(&hrtc);
+
+  /* Wait till RTC has finished handling the write transfer  */
+  while ((hrtc.Instance->CRL & RTC_CRL_RTOFF) == (uint32_t)RESET)
+  {
+  }
+
+  // Enable Alarm interrupt
+
+  __HAL_RTC_ALARM_ENABLE_IT(&hrtc, RTC_IT_ALRA);
+
+  HAL_PWR_EnterSTOPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFI);
+}
 
 void RTCOverflowEventCallback(RTC_HandleTypeDef *hrtc)
 {
   /* Prevent unused argument(s) compilation warning */
   UNUSED(hrtc);
 
+}
+
+void RTCAlarmAEventCallback(RTC_HandleTypeDef *hrtc)
+{
+  AlarmITTriggered = 1;
 }
 
 // Enable the overflow interrupt in the RTC

@@ -217,45 +217,30 @@ void RTC_IRQHandler(void)
 	    /* Get the status of the Interrupt */
 	    if (__HAL_RTC_SECOND_GET_FLAG(&hrtc, RTC_FLAG_SEC))
 	    {
-	      /* Check if overflow flag set */
-	      if (__HAL_RTC_SECOND_GET_FLAG(&hrtc, RTC_FLAG_OW))
-	      {
-	        /* Overflow callback */
-	    	  RTCOverflowEventCallback(&hrtc);
+	      /* Second callback */
+	      RTCSecondEventCallback(&hrtc);
+	      /* Change RTC state */
+	      (&hrtc)->State = HAL_RTC_STATE_READY;
 
-	        /* Clear flag Overflow */
-	        __HAL_RTC_OVERFLOW_CLEAR_FLAG(&hrtc, RTC_FLAG_OW);
-
-	        /* Change RTC state */
-	        (&hrtc)->State = HAL_RTC_STATE_READY;
-	      }
-	      else
-	      {
-	        /* Second callback */
-	    	RTCSecondEventCallback(&hrtc);
-	        /* Change RTC state */
-	        (&hrtc)->State = HAL_RTC_STATE_READY;
-	      }
 	      /* Clear flag Second */
 	      __HAL_RTC_SECOND_CLEAR_FLAG(&hrtc, RTC_FLAG_SEC);
 	    }
 	  }
-	  else if (__HAL_RTC_OVERFLOW_GET_IT_SOURCE(&hrtc, RTC_IT_OW))
+
+	  if (__HAL_RTC_ALARM_GET_IT_SOURCE(&hrtc, RTC_IT_ALRA))
 	  {
-	      /* Check if overflow flag set */
-	      if (__HAL_RTC_OVERFLOW_GET_FLAG(&hrtc, RTC_FLAG_OW))
-	      {
-	        /* Overflow callback */
-	    	  RTCOverflowEventCallback(&hrtc);
+	    /* Get the status of the Interrupt */
+	    if (__HAL_RTC_ALARM_GET_FLAG(&hrtc, RTC_FLAG_ALRAF))
+	    {
+	      /* Alarm callback */
+	    	RTCAlarmAEventCallback(&hrtc);
+	      /* Change RTC state */
+	      (&hrtc)->State = HAL_RTC_STATE_READY;
 
-	        /* Clear flag Overflow */
-	        __HAL_RTC_OVERFLOW_CLEAR_FLAG(&hrtc, RTC_FLAG_OW);
-
-	        /* Change RTC state */
-	        (&hrtc)->State = HAL_RTC_STATE_READY;
-	      }
+	      /* Clear flag Second */
+	      __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRAF);
+	    }
 	  }
-
 
   /* USER CODE END RTC_IRQn 0 */
   //HAL_RTCEx_RTCIRQHandler(&hrtc);
