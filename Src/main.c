@@ -540,6 +540,19 @@ void RTCAlarmDelayWithStop(uint32_t nTime)
   // Enable Alarm interrupt
 
   __HAL_RTC_ALARM_ENABLE_IT(&hrtc, RTC_IT_ALRA);
+ // Note: To enter Stop mode, all EXTI Line pending bits (in Pending register
+ // (EXTI_PR)) and RTC Alarm flag must be reset. Otherwise, the Stop mode entry
+ // procedure is ignored and program execution continues.
+ // To wake up from the Stop mode with an RTC alarm event, it is necessary to:
+ // Configure the EXTI Line 17 to be sensitive to rising edges (Interrupt or Event
+ // modes) using the EXTI_Init() function.
+ // Enable the RTC Alarm Interrupt using the RTC_ITConfig() function
+ // Configure the RTC to generate the RTC alarm using the RTC_SetAlarm()
+ // and RTC_AlarmCmd() functions.
+
+  EXTI->EMR = EXTI_EMR_MR17;              // event unmask line 17 (RTC)
+  EXTI->RTSR = EXTI_RTSR_TR17;            // rising edge detection
+
 
   HAL_PWR_EnterSTOPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFI);
 }
