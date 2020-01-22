@@ -21,26 +21,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include <stdlib.h>
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c2;
@@ -48,16 +28,13 @@ RTC_HandleTypeDef hrtc;
 TIM_HandleTypeDef htim2;
 
 accel_vect_t accel_vect_current;
+accel_vect_t accel_vect_prev;
+
 uint32_t led_enabled;
 
 static volatile uint32_t RTCSecondTdelayCounter = 0;
 static volatile uint32_t AlarmITTriggered = 0;
 
-
-/* USER CODE BEGIN PV */
-
-
-/* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -78,12 +55,7 @@ void Delay(uint32_t nTime)
     TimingDelay = nTime;
 	while(TimingDelay != 0);
 }
-//void SysTick_Handler(void)
-//{
-//if (TimingDelay != 0x00)
-//TimingDelay --;
-//}
-/* USER CODE END 0 */
+
 
 /**
   * @brief  The application entry point.
@@ -108,24 +80,14 @@ int main(void)
    */
   led_enabled = 0;
 
-  /* USER CODE END 1 */
-  
-
-  /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
 
   /* Configure the system clock */
   SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
@@ -133,13 +95,6 @@ int main(void)
   MX_RTC_Init();
   MX_TIM2_Init();
 
-  /* USER CODE BEGIN 2 */
-
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  //RTC_TimeTypeDef sTime1;
   uint32_t mainwhileloopcount = 0;
   GPIO_PinState PinStateLED;
   PinStateLED = GPIO_PIN_SET;
@@ -156,66 +111,136 @@ int main(void)
   mpu6050_writereg_simple(&hi2c2, false, 0x6b, 0x28);
   // Disable the gyros, set LP_WAKE_CTRL[1:0] to 1, which takes accelerometer readings
   // at 5Hz
+  // Set to 0 for 1.25Hz  10uA current
+  // Set to 1 for 5Hz  -  20uA current
   // Set to 2 for 20Hz
-  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x87);
+  // Set to 3 for 40Hz
+  // LP_WAKE_CTRL occupies bits [7:6] of the register
 
+  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x47);
 
-  //mpu6050_readreg_simple(&hi2c2, false, 0x6b, &rb_reg);
-  //mpu6050_readreg_simple(&hi2c2, false, 0x6c, &rb_reg);
-
+  const uint32_t GO_TO_SLEEP_TIMEOUT = 63;
   //int32_t temp_int32;
   //uint32_t pulseval_current;
   PinStateLED = GPIO_PIN_SET;
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 
-  //__HAL_RTC_ALARM_ENABLE_IT(&hrtc,RTC_IT_ALRA);
+  uint32_t state_timeout;
+  enum programstate{
+	  SLEEP,
+	  AWAKEN,
+	  AWAKE,
+	  GO_TO_SLEEP} state;
 
-  //sTime1.Hours = 0x00;
-  //sTime1.Minutes = 0x00;
-  //sTime1.Seconds = 0x00;
-  //HAL_RTC_SetTime(&hrtc, &sTime1, RTC_FORMAT_BCD);
-  //HAL_RTC_SetAlarm_IT()
-  //HAL_RTC_SetAlarm_IT(&hrtc, RTC_AlarmTypeDef * sAlarm, uint32_t Format)
-
+  state = SLEEP;
+  state_timeout = 0;
+  accel_vect_prev = (accel_vect_t){.x = 0, .y = 0, .z = 0};
 
   while (1)
   {
-    /* USER CODE END WHILE */
-	  PinStateLED = GPIO_PIN_SET;
-	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
+	  switch(state){
+	  case SLEEP:
+		  PinStateLED = GPIO_PIN_SET;
+		  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
+		  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
+		  if(AccelVectDeltAbs(accel_vect_current, accel_vect_prev) > 1000)
+		  {
+			  state = AWAKEN;
+			  state_timeout = 0;
+			  accel_vect_prev = accel_vect_current;
+		  }
+		  else
+		  {
+		      state = SLEEP;
+		      TIM2->CCR1 = 0;
+		      TIM2->CCR2 = 0;
+		      TIM2->CCR3 = 0;
 
-	  RTCAlarmDelayNoSleep(20);
-	  PinStateLED = GPIO_PIN_RESET;
-	  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
-	  //HAL_Delay(500);
-	  RTCAlarmDelayNoSleep(20);
+			  RTCAlarmDelayNoSleep(300);
+			  accel_vect_prev = accel_vect_current;
+
+			  //RTCAlarmDelayWithStop(400);
+		  }
+		  break;
+	  case AWAKEN:
+
+		  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
+		  TIM2->CCR1 = (ProcessAccelVal(accel_vect_current.x) * state_timeout) >> 6;
+		  TIM2->CCR2 = (ProcessAccelVal(accel_vect_current.y) * state_timeout) >> 6;
+		  TIM2->CCR3 = (ProcessAccelVal(accel_vect_current.z) * state_timeout) >> 6;
+	  	  if(state_timeout >= 63)
+	  	  {
+	  		  state = AWAKE;
+	  		  accel_vect_prev = accel_vect_current;
+	  		  state_timeout = 0;
+	  	  }
+	  	  else
+	  	  {
+	  		  state = AWAKEN;
+	  		  accel_vect_prev = accel_vect_current;
+	  		  state_timeout = state_timeout + 1;
+	  	  }
+
+		  RTCAlarmDelayNoSleep(20);
+
+	      break;
+	  case AWAKE:
+		  if(PinStateLED == GPIO_PIN_SET)
+			  PinStateLED = GPIO_PIN_RESET;
+		  else
+			  PinStateLED = GPIO_PIN_SET;
+		  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
+		  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
+		  TIM2->CCR1 = ProcessAccelVal(accel_vect_current.x);
+		  TIM2->CCR2 = ProcessAccelVal(accel_vect_current.y);
+		  TIM2->CCR3 = ProcessAccelVal(accel_vect_current.z);
+
+		  if(AccelVectDeltAbs(accel_vect_current, accel_vect_prev) > 500)
+		  {
+			  state_timeout = 0;
+		  }
+		  else
+		  {
+			  state_timeout = state_timeout + 1;
+		  }
+  		  accel_vect_prev = accel_vect_current;
 
 
+		  if(state_timeout >= 250)
+		  {
+			  state = GO_TO_SLEEP;
+			  state_timeout = 0;
+		  }
 
-	  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
+		  RTCAlarmDelayNoSleep(20);
 
-	  TIM2->CCR1 = ProcessAccelVal(accel_vect_current.x);
-	  TIM2->CCR2 = ProcessAccelVal(accel_vect_current.y);
-	  TIM2->CCR3 = ProcessAccelVal(accel_vect_current.z);
+		  break;
+	  case GO_TO_SLEEP:
+		  PinStateLED = GPIO_PIN_SET;
+		  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
+		  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
+		  TIM2->CCR1 = (ProcessAccelVal(accel_vect_current.x) * (GO_TO_SLEEP_TIMEOUT - state_timeout)) >> 6;
+		  TIM2->CCR2 = (ProcessAccelVal(accel_vect_current.y) * (GO_TO_SLEEP_TIMEOUT - state_timeout)) >> 6;
+		  TIM2->CCR3 = (ProcessAccelVal(accel_vect_current.z) * (GO_TO_SLEEP_TIMEOUT - state_timeout)) >> 6;
+	  	  if(state_timeout >= 63)
+	  	  {
+	  		  state = SLEEP;
+	  		  accel_vect_prev = accel_vect_current;
+	  		  state_timeout = 0;
+	  	  }
+	  	  else
+	  	  {
+	  		  state = GO_TO_SLEEP;
+	  		  state_timeout = state_timeout + 1;
+	  	  }
 
-	  if(mainwhileloopcount >= 30)
-	  {
-		  //TIM2->CCR1 = 0;
-		  //TIM2->CCR2 = 0;
-		  //TIM2->CCR3 = 0;
-		  //RTCAlarmDelayNoSleep(500);
-		  RTCAlarmDelayWithStop(500);
-		  mainwhileloopcount = 0;
+		  RTCAlarmDelayNoSleep(20);
+
+		  break;
 	  }
-	  else
-	  {
-	     mainwhileloopcount = mainwhileloopcount + 1;
-	  }
 
-	  //__HAL_TIM_SET_COMPARE;
-    /* USER CODE BEGIN 3 */
   }
-  /* USER CODE END 3 */
+
 }
 
 /**
@@ -445,8 +470,9 @@ uint32_t ProcessAccelVal(int16_t vectelem)
 		  returnval = 16383;
 	  }
 	  return returnval >> 2;
-
 }
+
+
 
 void RTCSecondEventCallback(RTC_HandleTypeDef *hrtc)
 {

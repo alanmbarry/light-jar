@@ -6,6 +6,7 @@
  */
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include "lib_mpu6050_stm32_hal.h"
 #include "stm32f1xx_hal_def.h"
 
@@ -95,5 +96,12 @@ HAL_StatusTypeDef mpu6050_get_accel_vect(I2C_HandleTypeDef *hi2c,
 	   *((uint8_t*)accel_vect + 5) = accel_dat_readbuf[4];
    }
    return ReturnStatus;
+}
 
+// Calculates the sum of the absolute differences between 2
+// acceleration vectors
+uint32_t AccelVectDeltAbs(accel_vect_t vecta,
+		                         accel_vect_t vectb)
+{
+	return abs(vecta.x - vectb.x) + abs(vecta.y - vectb.y) + abs(vecta.z - vectb.z);
 }

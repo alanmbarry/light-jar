@@ -37,4 +37,7 @@ HAL_StatusTypeDef mpu6050_get_accel_vect(I2C_HandleTypeDef *hi2c,
 		                           bool a0,
 								   accel_vect_t *accel_vect);
 
+uint32_t AccelVectDeltAbs(accel_vect_t vecta,
+		                         accel_vect_t vectb);
+
 #endif
