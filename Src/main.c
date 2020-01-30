@@ -66,7 +66,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
   /* Concept of code
    * Configuration
-   * Configruation of accelerometer
+   * Configuration of accelerometer
    *
    * Slow check mode
    * Measure accelerometer vector
@@ -75,6 +75,13 @@ int main(void)
    * Measure delta
    * If > x then go to fast update mode, else stay in slow check mode
    *
+   * Pin usage:
+   * 	B11 - SDA2 - to accelerometer
+   * 	B10 - SCL2 - to accelerometer
+   * 	A0  - PWM for LED channel
+   * 	A1  - PWM for LED channel
+   * 	A2  - PWM for LED channel
+   * 	A3  - power gate control for 12V step-up regulator
 
    *
    */
@@ -102,13 +109,20 @@ int main(void)
   PinStateLED = GPIO_PIN_RESET;
   HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 
+  // Turn off +12V regulator on powerup
+  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+
+
+
 
 
   // Configure the MPU6050
-  // Set the full-scale range of the accelerometer to ?
+  // Set the full-scale range of the accelerometer to +/- 4g
   mpu6050_writereg_simple(&hi2c2, false, 0x1C, 0x08);
   // Enable low-power cycle mode and disable the temperature sensor
   mpu6050_writereg_simple(&hi2c2, false, 0x6b, 0x28);
+
+  // Register 0x6C is the power management register
   // Disable the gyros, set LP_WAKE_CTRL[1:0] to 1, which takes accelerometer readings
   // at 5Hz
   // Set to 0 for 1.25Hz  10uA current
@@ -117,7 +131,8 @@ int main(void)
   // Set to 3 for 40Hz
   // LP_WAKE_CTRL occupies bits [7:6] of the register
 
-  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x47);
+  // 1.25 Hz:
+  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x07);
 
   const uint32_t GO_TO_SLEEP_TIMEOUT = 63;
   //int32_t temp_int32;
@@ -136,6 +151,11 @@ int main(void)
   state_timeout = 0;
   accel_vect_prev = (accel_vect_t){.x = 0, .y = 0, .z = 0};
 
+  uint32_t debugx = 0;
+  uint32_t debugy = 0;
+  uint32_t debugz = 0;
+
+
   while (1)
   {
 	  switch(state){
@@ -143,11 +163,13 @@ int main(void)
 		  PinStateLED = GPIO_PIN_SET;
 		  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 		  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
-		  if(AccelVectDeltAbs(accel_vect_current, accel_vect_prev) > 1000)
+		  if(AccelVectDeltAbs(accel_vect_current, accel_vect_prev) > 3000)
 		  {
 			  state = AWAKEN;
 			  state_timeout = 0;
 			  accel_vect_prev = accel_vect_current;
+			  // 40 Hz accelerometer refresh:
+			  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0xC7);
 		  }
 		  else
 		  {
@@ -156,14 +178,15 @@ int main(void)
 		      TIM2->CCR2 = 0;
 		      TIM2->CCR3 = 0;
 
-			  RTCAlarmDelayNoSleep(300);
+			  //RTCAlarmDelayNoSleep(1000);
+			  RTCAlarmDelayWithStop(1000);
+
 			  accel_vect_prev = accel_vect_current;
 
-			  //RTCAlarmDelayWithStop(400);
 		  }
 		  break;
 	  case AWAKEN:
-
+		  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
 		  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
 		  TIM2->CCR1 = (ProcessAccelVal(accel_vect_current.x) * state_timeout) >> 6;
 		  TIM2->CCR2 = (ProcessAccelVal(accel_vect_current.y) * state_timeout) >> 6;
@@ -191,11 +214,14 @@ int main(void)
 			  PinStateLED = GPIO_PIN_SET;
 		  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_13, PinStateLED);
 		  mpu6050_get_accel_vect(&hi2c2, false, &accel_vect_current);
-		  TIM2->CCR1 = ProcessAccelVal(accel_vect_current.x);
-		  TIM2->CCR2 = ProcessAccelVal(accel_vect_current.y);
-		  TIM2->CCR3 = ProcessAccelVal(accel_vect_current.z);
+		  debugx = ProcessAccelVal(accel_vect_current.x);
+		  debugy = ProcessAccelVal(accel_vect_current.y);
+		  debugz = ProcessAccelVal(accel_vect_current.z);
+		  TIM2->CCR1 = debugx;
+		  TIM2->CCR2 = debugy;
+		  TIM2->CCR3 = debugz;
 
-		  if(AccelVectDeltAbs(accel_vect_current, accel_vect_prev) > 500)
+		  if(AccelVectDeltAbs(accel_vect_current, accel_vect_prev) > 1000)
 		  {
 			  state_timeout = 0;
 		  }
@@ -206,7 +232,7 @@ int main(void)
   		  accel_vect_prev = accel_vect_current;
 
 
-		  if(state_timeout >= 250)
+		  if(state_timeout >= 500)
 		  {
 			  state = GO_TO_SLEEP;
 			  state_timeout = 0;
@@ -227,6 +253,10 @@ int main(void)
 	  		  state = SLEEP;
 	  		  accel_vect_prev = accel_vect_current;
 	  		  state_timeout = 0;
+			  HAL_GPIO_WritePin (GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+			  // 1.25 Hz accelerometer refresth:
+			  mpu6050_writereg_simple(&hi2c2, false, 0x6c, 0x07);
+
 	  	  }
 	  	  else
 	  	  {
@@ -372,6 +402,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStructure.Pull = GPIO_NOPULL;
   GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init (GPIOC, &GPIO_InitStructure);
+
+  GPIO_InitStructure.Pin = GPIO_PIN_3;
+  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStructure.Pull = GPIO_NOPULL;
+  GPIO_InitStructure.Speed =  GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init (GPIOA, &GPIO_InitStructure);
+
+
   /*
   GPIO_InitStructure.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2;
   // GPIO_MODE_AF_PP - AF means 'Alternate Function', i.e. on-chip peripheral,
@@ -464,10 +502,18 @@ uint32_t ProcessAccelVal(int16_t vectelem)
 	  uint32_t returnval;
 	  // Accelerometer value goes from ~ +/- 16384
 	  // Offset and saturate (to avoid overflow later)
-	  returnval = abs(vectelem);
-	  if(returnval > 16383)
+	  //returnval = abs(vectelem);
+	  if(vectelem < 0)
+	  {
+		  returnval = 0;
+	  }
+	  else if(vectelem > 16383)
 	  {
 		  returnval = 16383;
+	  }
+	  else
+	  {
+		  returnval = vectelem;
 	  }
 	  return returnval >> 2;
 }
